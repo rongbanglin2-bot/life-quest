@@ -48,14 +48,16 @@ const TALS=[
 ];
 // id, title, type, rarity, cost, picture, base amount; effects are handled by playCard.
 const CARD_DATA=[
- ['say','说不','attack','common',1,'不',6],['belt','系安全带','defense','common',1,'带',5],
+ ['say','说不','attack','common',1,'不',6],['refuse','拒绝延保','attack','common',1,'拒',6],['rumor','不转发','attack','common',1,'转',6],['lawyer','先请律师','attack','common',1,'律',6],['report','及时报警','attack','common',1,'警',6],
+ ['belt','系安全带','defense','common',1,'带',5],['helmet','戴头盔','defense','common',1,'盔',5],['password','邮箱独立密码','defense','common',1,'密',5],['contract','签书面合同','defense','common',1,'签',5],
  ['stop','一次停掉','attack','rare',2,'停',14],['walk','直接走开','attack','common',0,'走',4],['freeze','紧急止付','attack','rare',1,'止',8],['expose','拆穿话术','attack','epic',1,'拆',3],['proof','留证据','attack','rare',1,'证',7],['compound','复利','attack','epic',1,'利',4],['arbitrate','劳动仲裁','attack','rare',1,'仲',0],['escape','全身而退','attack','legendary',2,'退',20],
  ['reserve','应急金','defense','rare',2,'金',13],['pause','冷静期','defense','common',0,'静',3],['split','分散投资','defense','rare',1,'散',3],['warn','提前预警','defense','common',1,'预',6],
  ['read','读完再签','skill','common',0,'读',2],['sleep','早睡早起','skill','common',1,'睡',6],['check','体检','skill','rare',1,'检',3],['sugar','戒糖','skill','rare',1,'戒',2],['call','打 120','skill','epic',2,'救',10],['nap','补觉','skill','epic',0,'眠',2],
  ['steps','每天 8000 步','power','rare',1,'步',2],['train','力量训练','power','rare',1,'力',2],['evidence','循证','power','epic',1,'循',1],['risk','风控体系','power','rare',1,'控',4],['scam','反诈意识','power','rare',1,'诈',3],['life','人生复利','power','legendary',2,'生',1],['learn','终身学习','power','legendary',2,'习',1]
 ];
 const CARDS=Object.fromEntries(CARD_DATA.map(([id,name,type,rarity,cost,icon,amount])=>[id,{id,name,type,rarity,cost,icon,amount}]));
-const REWARDS=CARD_DATA.slice(2).map(x=>x[0]);
+const STARTER_IDS=['say','refuse','rumor','lawyer','report','belt','helmet','password','contract'];
+const REWARDS=CARD_DATA.filter(x=>!STARTER_IDS.includes(x[0])).map(x=>x[0]);
 const RARITY_ZH={common:'普通',rare:'稀有',epic:'史诗',legendary:'传说'};
 const RELICS=[
  ['belt','安全带','每场开局获得 8 护甲'],['alarm','烟雾报警器','首回合多抽 2 张'],['jar','应急金储蓄罐','胜利后恢复 6 生命'],
@@ -65,7 +67,7 @@ const RELICS=[
 ];
 const RELIC_BY_ID=Object.fromEntries(RELICS.map(([id,name,desc])=>[id,{id,name,desc}]));
 let S;
-function fresh(){return{phase:'intro',act:0,floor:0,route:[],talent:null,hp:70,maxHp:70,atk:0,def:0,deck:[...Array(5).fill({id:'say',up:false}),...Array(4).fill({id:'belt',up:false})],relics:[],score:0,correct:0,asked:0,streak:0,best:0,totalDamage:0,missed:[],questions:{1:[],2:[],3:[]},battle:null,checkpoint:null,seq:0}}
+function fresh(){return{phase:'intro',act:0,floor:0,route:[],talent:null,hp:70,maxHp:70,atk:0,def:0,deck:STARTER_IDS.map(id=>({id,up:false})),relics:[],score:0,correct:0,asked:0,streak:0,best:0,totalDamage:0,missed:[],questions:{1:[],2:[],3:[]},battle:null,checkpoint:null,seq:0}}
 function copy(x){return JSON.parse(JSON.stringify(x))}
 function hasRelic(id){return S.relics.includes(id)}
 function heal(n){S.hp=clamp(S.hp+n,0,S.maxHp)}
@@ -94,14 +96,14 @@ function attack(n,times=1){const b=S.battle,e=b.enemy;for(let i=0;i<times;i++){i
 function takeDamage(n,raw=false){const b=S.battle;let d=n;if(!raw){if(b.enemy.charge)d+=b.enemy.charge*3;if(b.enemy.weak)d=Math.floor(d*.75);if(b.vuln)d=Math.ceil(d*1.5);if(hasRelic('verify')&&!b.firstHit)d=Math.max(0,d-5);b.firstHit=true}let block=!raw&&b?Math.min(b.armor,d):0;if(b&&!raw)b.armor-=block;d-=block;S.hp=Math.max(0,S.hp-d);scene.hit(d);if(!raw&&b.buff.scam){let r=b.buff.scam;let shield=Math.min(b.enemy.armor,r);b.enemy.armor-=shield;r-=shield;b.enemy.hp=Math.max(0,b.enemy.hp-r);S.totalDamage+=r;if(b.enemy.hp<=0)winBattle()}if(S.hp<=0)die()}
 function cardNum(card){let base=CARDS[card.id].amount;return base+(card.up?(CARDS[card.id].type==='power'?1:CARDS[card.id].type==='skill'?2:3):0)}
 function cardDesc(card){const id=card.id,n=cardNum(card),atk=S.phase==='battle'?activeAttack():S.atk,def=S.phase==='battle'?activeDefense():S.def,a=x=>`<em>${x}</em>`;switch(id){
- case 'say':case 'stop':case 'walk':return `造成 ${a(n+atk)} 伤害。`;
+ case 'say':case 'refuse':case 'rumor':case 'lawyer':case 'report':case 'stop':case 'walk':return `造成 ${a(n+atk)} 伤害。`;
  case 'freeze':return `造成 ${a(n+atk)} 伤害，抽 1 张牌。`;
  case 'expose':return `造成 ${a(n+atk)} 伤害 ×3。`;
  case 'proof':return `造成 ${a(n+atk)} 伤害，施加 2 层易伤。`;
  case 'compound':return `造成 ${a(n*S.streak+atk)} 伤害（${n} × 连对数）。`;
  case 'arbitrate':return `造成等于当前护甲${card.up?' +3':''} 的 ${a((S.phase==='battle'?S.battle.armor:0)+(card.up?3:0)+atk)} 伤害。`;
  case 'escape':return `造成 ${a(n+atk)} 伤害，获得 ${a(10+def)} 护甲。`;
- case 'belt':case 'reserve':return `获得 ${a(n+def)} 护甲。`;
+ case 'belt':case 'helmet':case 'password':case 'contract':case 'reserve':return `获得 ${a(n+def)} 护甲。`;
  case 'pause':case 'warn':return `获得 ${a(n+def)} 护甲，抽 1 张牌。`;
  case 'split':return `获得 ${a(n+def)} 护甲 ×3。`;
  case 'read':return `抽 ${a(n)} 张牌。`;
@@ -151,7 +153,7 @@ function render(){if(!S)return;renderHud();renderMap();const screen=$('screen'),
  const relics=S.relics.length?`<div class="relic-list">${S.relics.map(id=>`<span class="relic-chip" title="${esc(RELIC_BY_ID[id].desc)}">${esc(RELIC_BY_ID[id].name)}</span>`).join('')}</div>`:'';
  if(S.help){screen.innerHTML=`<h2>玩法说明</h2><p>每回合先答一题，答对获得 ${TALS[S.talent]?.energy||3} 能量，答错获得 1 能量。点击手牌出牌，按 E 结束回合。护甲先吸收伤害；易伤增加所受伤害，虚弱减少造成伤害。</p><p>地图共三幕，每幕六层。击败敌人选新牌；在驿站赢得永久属性，在宝箱拿遗物，在休息点回血或升级牌。死亡可从本幕开头重来。</p><p>键盘：答题按 1–4；答完按数字键出对应位置的牌；结束回合按 E。</p><button class="btn" data-action="close-help">返回游戏</button>`;return}
  switch(S.phase){
- case 'intro':screen.innerHTML=`<h2>一张牌，改变一生</h2><p>从《高性价比人生指南》中寻找答案。用知识换取能量，构筑牌组，走过身体、钱包、红线三幕，成为人生赢家。</p><p class="muted">起始生命 70 · 初始牌组：说不 ×5、系安全带 ×4 · 共 ${Object.values(QUESTIONS).reduce((n,a)=>n+a.length,0)} 道题</p><button class="btn" data-action="open-talents">选择天赋</button>`;break;
+ case 'intro':screen.innerHTML=`<h2>一张牌，改变一生</h2><p>从《高性价比人生指南》中寻找答案。用知识换取能量，构筑牌组，走过身体、钱包、红线三幕，成为人生赢家。</p><p class="muted">起始生命 70 · 九张不同名字的起始牌（5 攻击、4 防御）· 共 ${Object.values(QUESTIONS).reduce((n,a)=>n+a.length,0)} 道题</p><button class="btn" data-action="open-talents">选择天赋</button>`;break;
  case 'talents':screen.innerHTML=`<h2>选择你的天赋</h2><div class="choice-grid">${TALS.map((t,i)=>`<button class="card talent power" data-action="talent" data-index="${i}"><span class="art">${t.icon}</span><span class="card-name">${t.name}</span><span class="card-desc">${t.desc}</span></button>`).join('')}</div>`;break;
  case 'map':screen.innerHTML=`<h2>第${['一','二','三'][S.act]}幕 · ${ACTS[S.act].name}</h2><p>第 ${S.floor+1} 层，选择下一站。</p>${relics}<div class="row">${S.route[S.floor].map(n=>`<button class="btn ghost node-choice" data-action="node" data-id="${n}">${NODE_CHAR[n]}<small style="display:block;font:11px var(--body)">${NODE_NAME[n]}</small></button>`).join('')}</div>`;break;
  case 'battle':{const b=S.battle;screen.innerHTML=`<h2>${esc(b.enemy.name)} <small class="muted">· 回合 ${b.turn}</small></h2>${b.answered?`<p class="notice">${b.question.order[b.question.chosen]===0?'答对获得能量，开始出牌！':'答错也获得 1 能量，继续战斗！'} 能量 ${b.energy}</p>`:`<p class="muted">先答题，再用能量出牌。</p>`}${questionHTML(b.question,b.answered)}${relics}`;break}
