@@ -1,0 +1,436 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="description" content="像素小人闯 8 个人生关卡，答对攒寿命、财富、自由，走到终点成为人生赢家。题目改编自《高性价比人生指南》。">
+<title>人生闯关</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=ZCOOL+KuaiLe&family=Noto+Sans+SC:wght@400;700&family=Press+Start+2P&display=swap">
+<style>
+/* Layout: one narrow column — HUD strip, pixel stage, then the question "dialog box" like an old handheld RPG. Single deliberate dark arcade look. */
+:root{
+  --bg:#161a31; --panel:#222949; --panel-2:#2c3460; --line:#3c467c; --shadow:#0b0e1f;
+  --fg:#f5efdf; --muted:#a8aecb;
+  --gold:#ffc94a; --life:#5fd49b; --free:#74c8ff; --bad:#ff6475;
+  --f-display:"ZCOOL KuaiLe","PingFang SC","Microsoft YaHei",sans-serif;
+  --f-body:"Noto Sans SC","PingFang SC","Microsoft YaHei",sans-serif;
+  --f-pixel:"Press Start 2P",ui-monospace,monospace;
+  color-scheme:dark;
+}
+html,body{background:var(--bg);color:var(--fg)}
+body{font-family:var(--f-body);font-size:15px;line-height:1.6}
+.wrap{max-width:780px;margin:0 auto;padding-inline:16px;padding-block:18px 28px;display:flex;flex-direction:column;gap:14px}
+header{display:flex;align-items:baseline;justify-content:space-between;gap:12px;flex-wrap:wrap}
+h1{font-family:var(--f-display);font-weight:400;font-size:clamp(28px,6vw,40px);margin:0;letter-spacing:.04em;color:var(--gold);text-shadow:3px 3px 0 var(--shadow)}
+header p{margin:0;color:var(--muted);font-size:13px}
+.box{background:var(--panel);border:3px solid var(--line);box-shadow:5px 5px 0 var(--shadow)}
+.hud{display:grid;grid-template-columns:1.1fr 1.3fr .9fr;gap:0}
+.hud>div{padding:10px 14px;min-width:0;display:flex;flex-direction:column;gap:6px}
+.hud>div+div{border-left:3px solid var(--line)}
+.lab{font-size:12px;color:var(--muted);letter-spacing:.08em;display:flex;justify-content:space-between;gap:8px}
+.pix{font-family:var(--f-pixel);font-variant-numeric:tabular-nums}
+.hp{display:grid;grid-template-columns:repeat(5,1fr);gap:4px}
+.hp i{height:14px;background:var(--shadow);border:2px solid var(--line);position:relative;overflow:hidden}
+.hp i b{position:absolute;inset:0;background:var(--bad);transform-origin:left;transition:transform .35s steps(4)}
+.hud .big{font-family:var(--f-pixel);font-size:18px;color:var(--gold);line-height:1.2}
+.chips{display:flex;gap:10px;flex-wrap:wrap;font-size:12px;color:var(--muted)}
+.chips span b{font-family:var(--f-pixel);font-size:10px;font-weight:400;margin-left:4px}
+.c-life b{color:var(--life)} .c-money b{color:var(--gold)} .c-free b{color:var(--free)}
+.lvl{font-family:var(--f-display);font-size:18px;line-height:1.2}
+.dots{display:flex;gap:4px}
+.dots i{width:10px;height:10px;background:var(--shadow);border:2px solid var(--line)}
+.dots i.d-ok{background:var(--life)} .dots i.d-no{background:var(--bad)} .dots i.d-now{border-color:var(--gold)}
+.combo{color:var(--gold);font-size:12px;min-height:1.2em}
+.stage{position:relative;padding:0;line-height:0}
+canvas{display:block;width:100%;height:clamp(190px,34vw,260px);image-rendering:pixelated}
+.panel{padding:18px 20px 20px;display:flex;flex-direction:column;gap:14px;min-height:230px}
+.tag{font-size:12px;color:var(--muted);letter-spacing:.08em}
+.tag b{color:var(--gold);font-weight:700}
+.q{font-size:18px;font-weight:700;margin:0;text-wrap:balance;line-height:1.5}
+.opts{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.opt{all:unset;box-sizing:border-box;cursor:pointer;display:flex;gap:10px;align-items:flex-start;padding:11px 13px;background:var(--panel-2);border:2px solid var(--line);color:var(--fg);font-size:15px;line-height:1.45;transition:transform .08s,border-color .12s}
+.opt:hover:not([disabled]){border-color:var(--gold);transform:translate(-1px,-1px);box-shadow:3px 3px 0 var(--shadow)}
+.opt:focus-visible{outline:3px solid var(--gold);outline-offset:2px}
+.opt .k{font-family:var(--f-pixel);font-size:10px;color:var(--gold);padding-top:4px;flex:none}
+.opt[disabled]{cursor:default;opacity:.55}
+.opt.ok{opacity:1;border-color:var(--life);background:color-mix(in srgb,var(--life) 18%,var(--panel-2))}
+.opt.no{opacity:1;border-color:var(--bad);background:color-mix(in srgb,var(--bad) 18%,var(--panel-2))}
+.fb{border-top:3px dashed var(--line);padding-top:12px;display:flex;flex-direction:column;gap:8px}
+.fb h3{margin:0;font-family:var(--f-display);font-weight:400;font-size:22px}
+.fb h3.good{color:var(--life)} .fb h3.bad{color:var(--bad)}
+.fb p{margin:0;max-width:62ch}
+.src{font-size:13px;color:var(--muted)}
+a{color:var(--free)}
+.row{display:flex;gap:10px;flex-wrap:wrap;align-items:center}
+.btn{all:unset;box-sizing:border-box;cursor:pointer;font-family:var(--f-display);font-size:19px;padding:9px 20px;background:var(--gold);color:#2a1d00;border:3px solid var(--shadow);box-shadow:4px 4px 0 var(--shadow);transition:transform .08s}
+.btn:hover{transform:translate(-1px,-1px);box-shadow:5px 5px 0 var(--shadow)}
+.btn:active{transform:translate(3px,3px);box-shadow:1px 1px 0 var(--shadow)}
+.btn:focus-visible{outline:3px solid var(--fg);outline-offset:3px}
+.btn.ghost{background:var(--panel-2);color:var(--fg)}
+.center{align-items:flex-start}
+.title{font-family:var(--f-display);font-size:30px;margin:0;color:var(--gold);line-height:1.2}
+.lead{margin:0;max-width:60ch}
+ul.rules{margin:0;padding-left:1.2em;display:flex;flex-direction:column;gap:4px;color:var(--muted)}
+ul.rules b{color:var(--fg)}
+.final{display:grid;grid-template-columns:repeat(3,1fr);gap:10px}
+.final div{background:var(--panel-2);border:2px solid var(--line);padding:10px 12px;display:flex;flex-direction:column;gap:4px}
+.final b{font-family:var(--f-pixel);font-size:14px;font-weight:400}
+.miss{margin:0;padding-left:1.2em;font-size:14px;display:flex;flex-direction:column;gap:4px}
+footer{font-size:12px;color:var(--muted);line-height:1.6}
+@media (max-width:560px){
+  .hud{grid-template-columns:1fr 1fr}
+  .hud>div:nth-child(3){grid-column:1/-1;border-left:0;border-top:3px solid var(--line);flex-direction:row;align-items:center;justify-content:space-between;flex-wrap:wrap}
+  .opts{grid-template-columns:1fr}
+  .final{grid-template-columns:1fr}
+  .q{font-size:17px}
+  .panel{padding:16px}
+}
+@media (prefers-reduced-motion:reduce){*{transition:none!important}}
+</style>
+<style>*,*::before,*::after{box-sizing:border-box}body{margin:0}[hidden]{display:none!important}</style>
+</head>
+<body>
+
+
+<div class="wrap">
+  <header>
+    <h1>人生闯关</h1>
+    <p>8 关 · 40 道题 · 题目改编自《高性价比人生指南》</p>
+  </header>
+
+  <section class="box hud" aria-label="状态">
+    <div>
+      <div class="lab"><span>生命值</span><span class="pix" id="hpNum">100</span></div>
+      <div class="hp" id="hpBar"><i><b></b></i><i><b></b></i><i><b></b></i><i><b></b></i><i><b></b></i></div>
+      <div class="combo" id="combo"></div>
+    </div>
+    <div>
+      <div class="lab"><span>人生价值</span></div>
+      <div class="big" id="total">0</div>
+      <div class="chips"><span class="c-life">寿命<b id="vLife">0</b></span><span class="c-money">财富<b id="vMoney">0</b></span><span class="c-free">自由<b id="vFree">0</b></span></div>
+    </div>
+    <div>
+      <div class="lvl" id="lvl">第 1 / 8 关</div>
+      <div class="dots" id="dots"></div>
+    </div>
+  </section>
+
+  <section class="box stage"><canvas id="cv" aria-label="小人闯关画面"></canvas></section>
+
+  <section class="box panel" id="panel" aria-live="polite"></section>
+
+  <footer>题目与解析改编自 <a href="https://eternity4719.github.io/HowToLiveBetter/" target="_blank" rel="noopener">高性价比人生指南</a>（eternity4719，CC BY 4.0），每题附原文条目链接，数字以原文为准。键盘可用 1–4 选答案，回车继续。</footer>
+</div>
+
+<script>
+const BOOK="https://eternity4719.github.io/HowToLiveBetter/#e-";
+const STAT={life:"寿命",money:"财富",free:"自由"};
+// q: [hazard, anchor, question, [correct, wrong...], explanation, stat]
+const LEVELS=[
+ {name:"马路与家里",sec:"第 1 节 · 不要早死",sky:["#7fc6ff","#d6f0ff"],hill:"#5aa86a",ground:"#8a5a3c",grass:"#6cc96b",mon:"#e2554f",sun:"#fff3b0",qs:[
+  ["车祸","1-1","坐网约车，你坐在后排。安全带要不要系？",["前后排都系","后排有前座挡着，不用系","只有上高速才需要系","市区短途不用系"],"前排系安全带，致命伤风险约降 45%。同一份美国数据里，第二排被撞死的人有六成没系。每次上车只多花 2 秒。","life"],
+  ["电动车","1-6","电动自行车的电池该在哪儿充电？",["小区规定的集中充电点","推进电梯带回家充","停在楼道里拉线充","把电池卸下来放卧室充"],"把电动车推进楼道、电梯，或者在家里充电，消防规定明令禁止，不改正的个人罚 500 到 1000 元。起火常在夜里，人正睡着。","life"],
+  ["毒蘑菇","1-5","山上采到一筐野生蘑菇，用银针一试没变黑。能吃吗？",["不能，野生蘑菇不采不买不吃","能，银针没变黑说明没毒","能，虫子吃过的就没毒","和大蒜一起煮就能解毒"],"所有土办法鉴别都不成立。2025 年全国记录了 828 起蘑菇中毒、2165 人中毒、13 人死亡，还新认出 34 种以前没记录过的毒蘑菇。","life"],
+  ["薄冰","1-41","冬天想去野外湖面滑冰，冰至少要多厚？",["15 厘米，而且边走边量","3 厘米，能站人就行","看着发白就说明冻结实了","冰钓洞旁边最厚，去那儿"],"国内官方的说法是冰厚 15 厘米成年人才能上去。发白的冰结实程度只有一半，同一片冰几步之外可能只有一两寸。","life"],
+  ["火灾","1-3","夜里家中起火，最可能把你及时叫醒的是？",["一个能正常工作的烟雾报警器","自己的鼻子，闻到烟就醒了","家里的猫狗","睡前把门窗关紧"],"能正常工作的烟雾报警器能把住宅火灾的死亡概率降约六成。起火时四成人在睡觉，光靠鼻子醒不过来。冬天烧煤、用燃气取暖的再装一个一氧化碳报警器。","life"]]},
+ {name:"日常习惯",sec:"第 2 节 · 不要慢慢死",sky:["#63b4f2","#c6ecff"],hill:"#4f9a74",ground:"#7c5638",grass:"#79c96a",mon:"#8d6bd8",sun:"#fff7c4",qs:[
+  ["香烟","2-4","决定戒烟了，哪种方式成功率更高？",["定一个戒烟日，到那天一次停掉","每天少抽几根，慢慢减到零","等压力小了再说","换成低焦油的烟"],"到第六个月，定好日子一次停掉的人里 22% 没再抽，慢慢减的只有 15.5%。再去拿戒烟药，成功率还能翻一倍多。","life"],
+  ["滚烫茶","2-30","刚泡好一壶滚烫的茶，怎么喝更好？",["放几分钟凉一凉再喝","趁烫喝，能杀菌","烫的才有茶味，一口闷","边吹边小口喝，烫点没关系"],"喝很烫的茶，得食管癌的概率是喝温茶的 8 倍。倒出来不到两分钟就喝，风险是等四分钟以上再喝的 5 倍。","life"],
+  ["久坐","2-11","想靠走路换寿命，每天大约走多少步就很划算？",["7000 到 8000 步","1000 步意思一下","不到 2 万步都没用","走路没用，只有跑步算"],"每天走 7800 步左右的人，同期死亡概率比只走 3500 步的低约四成半。按时间算，每周快走 150 到 300 分钟也行。","life"],
+  ["熬夜","2-38","昨晚加班熬了夜，最好的补救是？",["今晚就早点睡，把觉补上","攒到周末一次睡个够","喝咖啡硬撑，反正年轻","明天午睡三个小时"],"少睡之后第二天晚上没补上的人，死亡风险高约 15%，补上了的看不出升高。午睡最好在半小时内，超过一小时反而和冠心病风险升高有关。","life"],
+  ["甜饮料","2-7","想戒掉每天两瓶可乐，换成无糖可乐就算解决了吗？",["不算，最好换成白水或无糖茶","算，零糖就零风险","算，代糖还能减肥","不如改喝果汁"],"每天两瓶以上甜饮料的人，死亡风险高约两成。换成无糖也没看到好处，代糖饮料喝得多的人数字反而更高（可能是因果倒过来）。换白水或无糖茶最稳。","life"]]},
+ {name:"钱包保卫战",sec:"第 5 节 · 不要浪费钱",sky:["#f7a86b","#ffe0a8"],hill:"#7d9a52",ground:"#6e4a30",grass:"#a8c55c",mon:"#2f8f6e",sun:"#fff0c2",qs:[
+  ["彩票","5-5","买彩票每投入 1 元，长期平均能拿回多少？",["约 0.5 元","约 1 元，不亏不赚","约 2 元，总有人中大奖","说不准，全看运气"],"按规定，双色球拿出来当奖金的钱是销售额的 51%。也就是每投 1 元长期平均拿回 0.51 元，稳定亏掉 49%。","money"],
+  ["分期","5-7","分期付款写着「每月手续费 0.6%」，折成年化利率大约是？",["约 13.8%","7.2%，乘以 12 个月","0.6%，就是字面意思","不到 5%，比存款还低"],"本金每月在还，手续费却一直按最初的本金收，所以按年算约 13.8%。比贷款贵不贵，只看年化利率，别看月费率和日息。","money"],
+  ["高收益","5-6","朋友推荐一款「保本、年化 12%」的理财，你该？",["直接走开","先投一点试试水","问清楚是哪个大佬在做","收益高说明项目好，多投点"],"监管部门的说法：收益率超过 6% 就要打问号，超过 8% 很危险，10% 以上要准备赔光本金。正规理财已经不许承诺保本保收益。","money"],
+  ["管理费","5-18","同类基金，费率每年高 1 个百分点，30 年后到手的钱大约少多少？",["约 26%","约 1%","约 3%","没差别，看业绩就行"],"费率每高 1 个百分点，20 年后到手少约 18%，30 年后少约 26%。挑费率低的，是买基金时唯一能提前确定的事。","money"],
+  ["失业","5-27","突然失业，提前做好哪种准备能让你不用去借高息钱？",["存好 3 到 6 个月生活费的应急金","信用卡留足额度","买一份分红型保险","全仓股票，随时能卖"],"把 3 到 6 个月的生活费放在随时能取的地方，失业或生病时就不用借一年 18% 利息的钱，也不用亏着卖掉手里的资产。","money"]]},
+ {name:"智商税陷阱",sec:"第 6 节 · 反面清单",sky:["#b98be0","#f3c9e8"],hill:"#7a6bb0",ground:"#5d4067",grass:"#c08ad6",mon:"#f0a43a",sun:"#ffe6f4",qs:[
+  ["保健品","6-1","为了长寿，每天吃一片复合维生素有用吗？",["没用，死亡率和不吃的一样","有用，能多活好几年","越贵的越有用","进口的才有用"],"1.4 万名男医生吃了十一年复合维生素，心血管大事和死亡人数都和不吃的一样。9 项试验、5 万多人合起来看，对死亡也看不出作用。","money"],
+  ["防蓝光","6-16","天天对着电脑，要不要配副防蓝光眼镜护眼？",["不用，没看出护眼效果","要，不然几个月眼睛就废了","要，越贵的挡得越多","晚上戴就够了"],"和普通镜片比，戴防蓝光镜的人眼睛累不累、看得清不清都没差别。不过眼睛胀痛发红、看灯有一圈彩虹，要当急症去看。","money"],
+  ["八杯水","6-14","「每天必须喝够 8 杯水」，这说法靠谱吗？",["没有研究支持，渴了就喝","靠谱，少一杯都伤肾","靠谱，喝越多越排毒","要 16 杯才够"],"有人专门去追「每天 8 杯水」的出处，没找到一项支持它的研究。食物和别的饮料里本来就带着大量水分。","money"],
+  ["运动手环","6-8","买个运动手环记步数，能帮你多减点体重吗？",["试验里戴手环的反而减得少","能，数据会督促你","能，越贵越准越有效","戴着就会自动燃脂"],"超重的人做同样的饮食和运动安排，戴手环的两年减了 3.5 公斤，不戴的减了 5.9 公斤。花钱买设备帮不上减重的忙。","money"],
+  ["意志力课","6-25","「意志力像电池，白天用完晚上就没了」，所以该报班学攒意志力？",["不用，大规模重做实验效果几乎是零","要，千真万确","只对上班族成立","说明晚上不能做任何决定"],"23 个实验室、2141 人按同一套方案重做这个实验，结果几乎是零。真正有用的是改环境，比如把不想碰的东西挪远。","money"]]},
+ {name:"防骗与自保",sec:"第 8 节 · 别把自己搭进去",sky:["#3a4a8c","#8a7fc9"],hill:"#2f3d6e",ground:"#3b3550",grass:"#5c6aa8",mon:"#e04a8a",sun:"#f4f1ff",qs:[
+  ["诈骗","8-2","刚转完账发现被骗了，第一步做什么？",["立刻打 110 或 96110 要求止付","先上网查查对方是谁","找对方理论，要回来","等明天去银行问问"],"钱刚转出去那一小段时间是唯一的窗口，警方可以紧急止付、快速冻结。等钱被层层转走、分散开，就基本追不回了。","money"],
+  ["AI 换脸","8-4","「老板」开视频让你马上转一笔款，脸和声音都对得上。怎么办？",["挂断，用通讯录里存的旧号码打回去核实","看到脸了，转","对方说信号不好，先转一半","让对方发张证件截图"],"看见脸、听见声音都不算核实。涉及转账先挂断，用自己通讯录里的旧号码打回去，或者找共同认识的人问一句。","money"],
+  ["AB 贷","8-45","朋友请你「帮忙刷个脸、做个见证」，替他办一笔贷款。你实际是什么身份？",["借款人，他不还银行就找你","见证人，签个字没责任","担保人，最多赔一半","无关的路人"],"所谓帮忙刷脸、做见证，其实是用你的名字向银行借钱，这叫 AB 贷。钱转给熟人以后，银行照样找你还。","money"],
+  ["肇事","8-1","开车不小心撞了人，周围没人看见。该怎么做？",["停车、救人、报警，不要跑","先开走，回头再说","把人挪到路边再走","找熟人来顶包"],"跑了就默认算你全责，驾照吊销、这辈子不能再考，车损险和三者险对逃逸一律不赔，几十万赔偿全要自己出。","free"],
+  ["赖账","8-41","借给同事 5 万，打电话催还时想录音留证据，要先告诉他吗？",["不用，自己参加的谈话可以直接录","必须告知，否则录音违法","必须当面签字同意才行","录了也没用，法院不认"],"自己参加的谈话可以录，没提前告诉对方，不会单凭这点就不能当证据。尽量让人、事、钱数和时间对得上。窃听别人的谈话才不行。","money"]]},
+ {name:"法律红线",sec:"第 9 节 · 普通人容易踩的法律红线",sky:["#5f6f86","#b8c4cf"],hill:"#4a5a6a",ground:"#45403f",grass:"#7d8f86",mon:"#d9483b",sun:"#e6edf2",qs:[
+  ["跑分","9-5","网上「兼职」：用你自己的银行卡收款再转出去，每单给 50 元。做不做？",["不做，这是在帮人洗钱","做，钱又不是我骗的","只做几单没关系","用家人的卡就没事"],"这类兼职挣几百块，代价是一份案底。把银行卡、手机卡、支付账号借给或卖给别人，本身就违法，情节严重的要追刑责。","free"],
+  ["高空抛物","9-9","住 15 楼，顺手把烟头从阳台扔下去，没砸到人。会怎样？",["一样可能被拘留罚款","没砸到人就没事","烟头太小，不算","晚上扔没人管"],"往楼下扔东西，没砸到人也能拘留 5 日、罚 1000 元，情节严重的拘留 10 到 15 日。砸到人就换罪名了。","free"],
+  ["赌局","9-13","过年和亲戚打麻将，哪种做法踩了红线？",["组局抽头、当庄收钱","亲友之间小额打几圈","只玩不带钱","打完一起吃饭"],"亲友之间小额打牌法律不管。一旦抽头、当庄、组局收钱，性质就变了。网络赌博一律别碰。","free"],
+  ["谣言","9-1","群里有人发「某地爆炸死了上百人」，你没法核实。转不转？",["不转，假消息转发也要被罚","转，又不是我编的","转之前加一句「不知真假」就行","P 一张现场图更有说服力"],"明知是假的灾情、疫情、警情还转，罚得和自己编一样重：拘留 5 到 10 日，罚 1000 元。P 图或用 AI 造现场图更严重。","free"],
+  ["捡卡","9-7","路上捡到一张银行卡，密码就贴在背面。怎么办？",["联系银行或交给警察，不取钱","去 ATM 取点当好处费","取完再把卡扔回原处","卡里钱不多就没事"],"拿捡来的卡去 ATM 取钱，算冒用别人的信用卡，数额较大判 5 年以下，还要罚 2 万到 20 万元。警察直接立案，不用失主去告。","free"]]},
+ {name:"紧急救援",sec:"第 13 节 · 紧急情况",sky:["#e86a5a","#ffc1a1"],hill:"#a8504c",ground:"#5a3a34",grass:"#d98b5c",mon:"#3d3d55",sun:"#fff1d6",qs:[
+  ["心脏骤停","13-1","家人突然倒地，叫不应、没呼吸。你先做什么？",["立刻用力按压胸口，让别人打 120、拿 AED","先掐人中","先扶起来喂点水","先打电话找家属商量"],"有人按压，活着出院的比例从 3.9% 升到 16.1%。双手叠在两乳头连线中点，每秒按 2 次，手别停。79.2% 的心脏骤停发生在家里。","life"],
+  ["烫伤","13-14","被开水烫了手，正确做法是？",["凉的流动水冲 20 分钟","抹牙膏","抹酱油","马上用冰块敷"],"3 小时内用凉的流动水冲够 20 分钟，后来要植皮的可能性约只有没冲的六成。冰敷会加重损伤，牙膏、酱油、香油都别抹。","life"],
+  ["中风","13-3","爸爸突然嘴歪、一侧胳膊抬不起来、说话不清。怎么办？",["立刻打 120","躺下休息看会不会好","自己开车送去医院","先吃片降压药"],"立刻打 120，别等，也别自己开车。发病 3 小时内用药打通血管，恢复到生活基本自理的可能性约是不用药的 1.75 倍。","life"],
+  ["溺水","13-25","看到有人在河里溺水，你水性一般。怎么做？",["大喊叫人、打电话，递竿子或抛漂浮物","马上跳下去救","几个人手拉手下水","脱掉衣服再跳"],"溺水的人会本能地把施救者往水下按，下水的人自己也可能淹死。顺序是叫人、打 110/120、递长杆绳子、抛救生圈或空桶。","life"],
+  ["火场","13-24","楼里着火，走廊有烟。怎么逃？",["贴地爬，开门前先摸门，走楼梯","坐电梯最快","站直了冲出去","先回屋收拾贵重物品"],"趴到地上从烟底下爬向出口。门把或门板烫就别开这扇门，换条路。走楼梯不坐电梯，出去了别回头。","life"]]},
+ {name:"职场与账号",sec:"第 19 节 · 在职离职 & 第 14 节 · 账号安全",sky:["#2c6f91","#f0b27a"],hill:"#2e566b",ground:"#3b3a46",grass:"#4f8c8a",mon:"#c7b23a",sun:"#ffe2b8",qs:[
+  ["加班","19-1","国庆节被叫回公司上了一天班，加班费怎么算？",["日工资的 3 倍，不能拿补休顶","1.5 倍","补一天假就两清","自愿加班没有钱"],"平时加班 1.5 倍，休息日加班又不补休 2 倍。元旦、春节、劳动节、国庆这类法定假日 3 倍，而且不能拿补休顶掉。","money"],
+  ["劝退","19-7","公司想裁你，HR 递来一份「因个人原因主动辞职」让你签。怎么办？",["不签，签了经济补偿通常就没了","签，好聚好散","签了再去仲裁也一样","要个口头承诺再签"],"签字承认「个人原因主动辞职」，经济补偿和失业保险金通常一起落空。先把工资条、考勤、合同和聊天记录存下来。","money"],
+  ["裁员","19-4","在公司干了 3 年 8 个月被裁，经济补偿 N 是几个月工资？",["4 个月","3 个月","3.5 个月","1 个月"],"每满一年给一个月，满半年不满一年按一年算，不满半年给半个月，所以 3 年 8 个月算 4。月工资按走人前 12 个月平均，奖金津贴都算进去。","money"],
+  ["丢手机","14-4","手机丢了，第一步先做什么？",["打运营商客服挂失 SIM 卡","先报警","先冻结所有银行卡","先买新手机"],"第一步挂失 SIM 卡，切断验证码这条命脉；再远程锁定、改密码、报警、看情况冻卡。手机不在身上，借别人的打客服也能挂失。","free"],
+  ["盗刷","14-5","信用卡被盗刷了，谁来证明「这笔是不是你刷的」？",["银行要证明是你本人刷的","你自己拿出证据","警察说了算","商家负责证明"],"一发现就挂失冻结、报警，然后要求银行赔。证明这笔是你本人刷的是银行的责任，拿不出证据就得赔你。","money"]]}
+];
+const NQ=LEVELS.reduce((a,l)=>a+l.qs.length,0);
+
+/* ---------- state ---------- */
+let S;
+function fresh(){return{screen:"start",li:0,qi:0,hp:100,val:{life:0,money:0,free:0},combo:0,best:0,right:0,wrong:0,marks:[],missed:[],order:null,picked:null,lastPts:0,ckpt:null}}
+const $=id=>document.getElementById(id);
+const panel=$("panel");
+function shuffle(n){const a=[...Array(n).keys()];for(let i=n-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[a[i],a[j]]=[a[j],a[i]]}return a}
+const total=()=>S.val.life+S.val.money+S.val.free;
+const cur=()=>LEVELS[S.li].qs[S.qi];
+
+/* ---------- HUD ---------- */
+function hud(){
+  $("hpNum").textContent=S.hp;
+  [...$("hpBar").children].forEach((c,i)=>{const f=Math.max(0,Math.min(1,(S.hp-i*20)/20));c.firstChild.style.transform=`scaleX(${f})`});
+  $("total").textContent=total().toLocaleString("en");
+  $("vLife").textContent=S.val.life;$("vMoney").textContent=S.val.money;$("vFree").textContent=S.val.free;
+  $("combo").textContent=S.combo>=2?`连对 ×${S.combo}`:"";
+  const L=LEVELS[S.li];
+  $("lvl").textContent=S.screen==="end"?"通关":`第 ${S.li+1} / ${LEVELS.length} 关`;
+  $("dots").innerHTML=L.qs.map((_,i)=>{const m=S.marks[S.li*5+i];return`<i class="${m===1?"d-ok":m===0?"d-no":""} ${S.screen!=="end"&&i===S.qi?"d-now":""}"></i>`}).join("");
+}
+
+/* ---------- panels ---------- */
+const esc=s=>s.replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
+function srcLink(a){const [c,n]=a.split("-");return`<a href="${BOOK}${a}" target="_blank" rel="noopener">原文：第 ${c} 节第 ${n} 条 ↗</a>`}
+
+function render(){
+  hud();
+  const L=LEVELS[S.li];
+  if(S.screen==="start"){
+    panel.innerHTML=`<div class="center" style="display:flex;flex-direction:column;gap:12px">
+      <p class="title">把人生过成一路通关</p>
+      <p class="lead">小人要穿过 8 个人生关卡。每个关卡都有拦路的坑：车祸、骗局、智商税、法律红线……答对就跳过去，把寿命、财富和自由攒成人生价值。走到终点，就是人生赢家。</p>
+      <ul class="rules"><li>答对：<b>人生价值 +100</b>，连对还有加成</li><li>答错：<b>生命值 −20</b>，归零就要从本关重来</li><li>每通过一关：<b>生命值 +15</b></li></ul>
+      <div class="row"><button class="btn" id="go">开始闯关</button></div></div>`;
+    $("go").onclick=()=>{S.screen="play";S.ckpt=ck();ask(true)};
+    $("go").focus({preventScroll:true});
+    return;
+  }
+  if(S.screen==="play"||S.screen==="feedback"){
+    const q=cur(), done=S.screen==="feedback";
+    const opts=S.order.map((oi,k)=>{
+      let cls="opt";if(done){if(oi===0)cls+=" ok";else if(k===S.picked)cls+=" no"}
+      return`<button class="${cls}" data-k="${k}" ${done?"disabled":""}><span class="k">${k+1}</span><span>${esc(q[3][oi])}</span></button>`}).join("");
+    let fb="";
+    if(done){
+      const ok=S.order[S.picked]===0;
+      fb=`<div class="fb"><h3 class="${ok?"good":"bad"}">${ok?`跳过去了！+${S.lastPts} ${STAT[q[5]]}`:`踩坑了！生命值 −20`}</h3>
+        <p>${esc(q[4])}</p><div class="src">${srcLink(q[1])}</div>
+        <div class="row"><button class="btn" id="next">${S.qi===4?"冲过关卡 →":"继续前进 →"}</button></div></div>`;
+    }
+    panel.innerHTML=`<div class="tag"><b>${L.name}</b> · ${L.sec} · 第 ${S.qi+1}/5 题 · 拦路的坑：${q[0]}</div>
+      <p class="q">${esc(q[2])}</p><div class="opts">${opts}</div>${fb}`;
+    panel.querySelectorAll(".opt:not([disabled])").forEach(b=>b.onclick=()=>answer(+b.dataset.k));
+    if(done){$("next").onclick=next;$("next").focus({preventScroll:true})}
+    return;
+  }
+  if(S.screen==="clear"){
+    const nl=LEVELS[S.li+1];
+    panel.innerHTML=`<div style="display:flex;flex-direction:column;gap:12px">
+      <p class="title">第 ${S.li+1} 关通关：${L.name}</p>
+      <p class="lead">休整一下，生命值 +15。下一关是「${nl.name}」（${nl.sec}）。</p>
+      <div class="row"><button class="btn" id="go">进入第 ${S.li+2} 关</button></div></div>`;
+    $("go").onclick=()=>{S.li++;S.qi=0;S.screen="play";S.ckpt=ck();scene.banner(S.li);ask(true)};
+    $("go").focus({preventScroll:true});return;
+  }
+  if(S.screen==="over"){
+    panel.innerHTML=`<div style="display:flex;flex-direction:column;gap:12px">
+      <p class="title" style="color:var(--bad)">生命值归零</p>
+      <p class="lead">在「${L.name}」这一关倒下了。人生没有读档，但游戏有：可以从本关开头重来，带着之前攒下的人生价值。</p>
+      <div class="row"><button class="btn" id="retry">从本关重来</button><button class="btn ghost" id="restart">从头开始</button></div></div>`;
+    $("retry").onclick=()=>{const c=S.ckpt;Object.assign(S,JSON.parse(JSON.stringify(c)));S.hp=Math.max(S.hp,60);S.screen="play";S.ckpt=ck();scene.revive();ask(true)};
+    $("restart").onclick=restart;$("retry").focus({preventScroll:true});return;
+  }
+  if(S.screen==="end"){
+    const r=rank();
+    const miss=S.missed.length?`<p class="tag">踩过的坑，值得回原文再看一眼：</p><ul class="miss">${S.missed.map(m=>{const q=LEVELS[m[0]].qs[m[1]];return`<li>${esc(q[0])}：<a href="${BOOK}${q[1]}" target="_blank" rel="noopener">${esc(q[2])}</a></li>`}).join("")}</ul>`:`<p class="lead">一个坑都没踩，满分通关。</p>`;
+    panel.innerHTML=`<div style="display:flex;flex-direction:column;gap:14px">
+      <p class="title">恭喜，你成了${r[0]}！</p>
+      <p class="lead">${r[1]}</p>
+      <div class="final"><div><span class="tag">人生价值</span><b style="color:var(--gold)">${total().toLocaleString("en")}</b></div>
+        <div><span class="tag">答对</span><b>${S.right} / ${NQ}</b></div><div><span class="tag">最长连对</span><b>${S.best}</b></div></div>
+      ${miss}
+      <div class="row"><button class="btn" id="restart">再闯一次</button><a href="https://eternity4719.github.io/HowToLiveBetter/" target="_blank" rel="noopener">去读完整的 654 条 ↗</a></div></div>`;
+    $("restart").onclick=restart;
+  }
+}
+function rank(){
+  if(S.wrong===0)return["满分人生赢家","40 道题全对，寿命、财富、自由一样没丢。现实里挑一两条去做，就已经赚了。"];
+  if(S.right>=34)return["人生赢家","大部分坑都绕开了。剩下几个踩过的，下面列着原文链接。"];
+  if(S.right>=26)return["稳健型人生赢家","磕磕碰碰，但一路走到了终点。看看踩过的坑，下次能少掉不少血。"];
+  return["逆袭型人生赢家","摔了不少跤，还是爬到了终点。这本指南的作者也说，大部分条目他自己都没做到，挑一条开始就好。"];
+}
+function ck(){const c=JSON.parse(JSON.stringify(S));c.ckpt=null;return c}
+function restart(){S=fresh();S.screen="play";S.ckpt=ck();scene.reset();ask(true)}
+function ask(newQ){S.order=shuffle(4);S.picked=null;render();if(newQ)scene.approach(cur()[0])}
+function answer(k){
+  if(S.screen!=="play")return;
+  S.picked=k;const q=cur(),ok=S.order[k]===0,idx=S.li*5+S.qi;
+  if(ok){S.combo++;S.best=Math.max(S.best,S.combo);const pts=100+Math.min(100,(S.combo-1)*20);S.lastPts=pts;S.val[q[5]]+=pts;S.right++;S.marks[idx]=1;scene.jump(`+${pts} ${STAT[q[5]]}`,q[5])}
+  else{S.combo=0;S.hp=Math.max(0,S.hp-20);S.wrong++;S.marks[idx]=0;S.missed.push([S.li,S.qi]);scene.hit()}
+  S.screen="feedback";render();
+}
+function next(){
+  if(S.hp<=0){S.screen="over";scene.fall();render();return}
+  if(S.qi<4){S.qi++;S.screen="play";ask(true);return}
+  if(S.li<LEVELS.length-1){S.hp=Math.min(100,S.hp+15);S.screen="clear";scene.clear();render();return}
+  S.screen="end";scene.ending();render();
+}
+document.addEventListener("keydown",e=>{
+  if(e.target.closest&&e.target.closest("a"))return;
+  if(S.screen==="play"&&/^[1-4]$/.test(e.key)){answer(+e.key-1)}
+});
+
+/* ---------- pixel scene ---------- */
+const scene=(()=>{
+  const cv=$("cv"),cx=cv.getContext("2d");
+  let W=0,H=0,P=4,DPR=1;
+  const RM=matchMedia("(prefers-reduced-motion: reduce)").matches;
+  const HERO=[
+"....HHHH....","...HHHHHH...","..HHHHHHHH..","..HSSSSSSH..","..SSESSESS..","..SSSSSSSS..","...SSMMSS...","....SSSS....",
+"..BBBBBBBB..",".SBBBBBBBBS.",".SBBYBBBBBS.","..BBBBBBBB..","..PPPPPPPP..","..PPP..PPP.."];
+  const LEG=[["..PPP..PPP..","..KK....KK.."],[".PPP....PPP.",".KK......KK."]];
+  const SUIT=[
+"..BBBBBBBB..",".SBBWRRWBBS.",".SBBWRRWBBS.","..BBBRRBBB.."];
+  const MON=[
+"....OOOO....","..OOOOOOOO..",".OOOOOOOOOO.",".OOWWOOWWOO.",".OOWKOOWKOO.","OOOOOOOOOOOO","OOOOOOOOOOOO","OOOKOKKOKOOO","OOOOOOOOOOOO",".OO.OO.OO.OO"];
+  const HOUSE=[
+".....RRRR.....","....RRRRRR....","...RRRRRRRR...","..RRRRRRRRRR..",".RRRRRRRRRRRR.","..WWWWWWWWWW..","..WGGWWWWGGW..","..WGGWDDWGGW..","..WWWWDDWWWW..","..WWWWDDWWWW.."];
+  const heroPal={H:"#3a2a22",S:"#f2c49b",E:"#1b1b2a",M:"#c45a5a",B:"#3f7fd6",Y:"#ffd84a",P:"#2b3150",K:"#1a1a26",W:"#ffffff",R:"#d8364a"};
+  let st={mode:"idle",t0:0,dur:0,label:"",monX:null,monAlive:false,heroX:0,heroY:0,scroll:0,walk:false,hurt:0,li:0,pops:[],parts:[],banner:null,fallen:false,end:false,shake:0};
+  function size(){const r=cv.getBoundingClientRect();DPR=Math.min(2,window.devicePixelRatio||1);W=r.width;H=r.height;cv.width=Math.round(W*DPR);cv.height=Math.round(H*DPR);cx.setTransform(DPR,0,0,DPR,0,0);P=Math.max(3,Math.floor(H/52))}
+  new ResizeObserver(size).observe(cv);size();
+  const gy=()=>Math.round(H*0.78);
+  function spr(g,pal,x,y,p=P){for(let r=0;r<g.length;r++)for(let c=0;c<g[r].length;c++){const ch=g[r][c];if(ch==="."||!pal[ch])continue;cx.fillStyle=pal[ch];cx.fillRect(Math.round(x+c*p),Math.round(y+r*p),p,p)}}
+  function now(){return performance.now()}
+  function prog(){return st.dur?Math.min(1,(now()-st.t0)/st.dur):1}
+  function setMode(m,d){st.mode=m;st.t0=now();st.dur=RM?Math.min(d,150):d}
+  const L=()=>LEVELS[st.li];
+  function heroBaseX(){return Math.round(W*0.2)}
+  function monTargetX(){return Math.round(W*0.62)}
+  function bg(){
+    const lv=L();
+    if(st.end){const g=cx.createLinearGradient(0,0,0,H);g.addColorStop(0,"#ff9a7a");g.addColorStop(1,"#ffe39a");cx.fillStyle=g;cx.fillRect(0,0,W,H)}
+    else{const g=cx.createLinearGradient(0,0,0,H);g.addColorStop(0,lv.sky[0]);g.addColorStop(1,lv.sky[1]);cx.fillStyle=g;cx.fillRect(0,0,W,H)}
+    // sun
+    cx.fillStyle=st.end?"#fff6d0":lv.sun;const sr=P*5,sx=W*0.84,sy=H*0.24;
+    for(let y=-sr;y<=sr;y+=P)for(let x=-sr;x<=sr;x+=P)if(x*x+y*y<=sr*sr)cx.fillRect(Math.round(sx+x),Math.round(sy+y),P,P);
+    // clouds
+    cx.fillStyle="rgba(255,255,255,.75)";
+    for(let i=0;i<4;i++){let x=((i*W*0.33-st.scroll*0.15)%(W+120)+W+120)%(W+120)-80,y=H*(0.12+0.09*(i%2));
+      cx.fillRect(Math.round(x),Math.round(y),P*10,P*2);cx.fillRect(Math.round(x+P*2),Math.round(y-P*2),P*5,P*2)}
+    // hills
+    cx.fillStyle=st.end?"#e58a6c":lv.hill;const g0=gy();
+    for(let x=0;x<W+P;x+=P){const wx=x+st.scroll*0.35;const h=H*0.16+Math.sin(wx/70)*H*0.05+Math.sin(wx/23)*H*0.02;cx.fillRect(x,Math.round(g0-h),P,Math.ceil(h))}
+    // ground
+    cx.fillStyle=st.end?"#7a4a3a":lv.ground;cx.fillRect(0,g0,W,H-g0);
+    cx.fillStyle=st.end?"#f0b35a":lv.grass;cx.fillRect(0,g0,W,P*2);
+    cx.fillStyle="rgba(0,0,0,.18)";for(let x=-(st.scroll%(P*8));x<W;x+=P*8)cx.fillRect(Math.round(x),g0+P*4,P*3,P);
+  }
+  function drawHero(x,y,frame,crown){
+    const yy=y-HERO.length*P-2*P;
+    spr(HERO,heroPal,x,yy);
+    if(crown){spr(SUIT,heroPal,x,yy+8*P)}
+    spr(LEG[frame],heroPal,x,yy+HERO.length*P);
+    if(crown){const c={Y:"#ffd84a",R:"#e0384c"};spr([".Y..Y..Y.",".YYRYYRYY",".YYYYYYYY"].map(r=>r),c,x+P*1.5,yy-P*3)}
+  }
+  function drawMon(x,col,sq){
+    const g0=gy(),h=MON.length*P;cx.save();cx.translate(x+6*P,g0);cx.scale(1+sq*0.25,1-sq*0.3);
+    spr(MON,{O:col,W:"#ffffff",K:"#1a1a26"},-6*P,-h);cx.restore();
+  }
+  function sign(x,text){
+    const g0=gy(),y=g0-MON.length*P-P*9;cx.font=`${Math.max(13,P*3.6)}px "ZCOOL KuaiLe","PingFang SC",sans-serif`;
+    const w=cx.measureText(text).width+P*4;cx.fillStyle="#6b4a2c";cx.fillRect(Math.round(x+6*P-P/2),y+P*6,P,P*3);
+    cx.fillStyle="#fff4d6";cx.fillRect(Math.round(x+6*P-w/2),y,Math.round(w),P*6);cx.fillStyle="#3a2a22";cx.strokeStyle="#3a2a22";cx.lineWidth=2;cx.strokeRect(Math.round(x+6*P-w/2)+1,y+1,Math.round(w)-2,P*6-2);
+    cx.textAlign="center";cx.textBaseline="middle";cx.fillText(text,x+6*P,y+P*3+1);
+  }
+  function pop(text,color,x,y){st.pops.push({text,color,x,y,t0:now()})}
+  function burst(x,y,cols,n=24){for(let i=0;i<n;i++){const a=Math.random()*Math.PI*2,s=1.5+Math.random()*3.5;st.parts.push({x,y,vx:Math.cos(a)*s,vy:Math.sin(a)*s-2,c:cols[i%cols.length],life:1})}}
+  let lastFire=0;
+  function frame(){
+    const t=now();cx.clearRect(0,0,W,H);
+    const shaking=st.shake>0;if(shaking){cx.save();cx.translate((Math.random()-.5)*st.shake,0);st.shake*=0.85;if(st.shake<0.5)st.shake=0}
+    bg();
+    const g0=gy(),p=prog();let hx=heroBaseX(),hy=g0,walkF=0;
+    if(st.end){
+      // podium + house
+      spr(HOUSE,{R:"#c8463a",W:"#fff3dc",G:"#7cc6f2",D:"#6b4a2c"},W*0.62,g0-HOUSE.length*P*1.4,P*1.4);
+      const px=W*0.28;cx.fillStyle="#ffd84a";cx.fillRect(Math.round(px-P*2),g0-P*6,P*16,P*6);cx.fillStyle="#c79b1e";cx.fillRect(Math.round(px-P*2),g0-P*2,P*16,P*2);
+      const bob=RM?0:Math.abs(Math.sin(t/260))*P*2;
+      drawHero(px,g0-P*6-bob,0,true);
+      cx.font=`${Math.max(18,P*5)}px "ZCOOL KuaiLe",sans-serif`;cx.textAlign="center";cx.textBaseline="top";
+      cx.fillStyle="#3a2a22";cx.fillText("人生赢家",W*0.5+2,H*0.07+2);cx.fillStyle="#fff";cx.fillText("人生赢家",W*0.5,H*0.07);
+      if(!RM&&t-lastFire>650){lastFire=t;burst(W*(0.15+Math.random()*0.7),H*(0.15+Math.random()*0.25),["#ffd84a","#ff6475","#74c8ff","#5fd49b","#ffffff"],30)}
+    } else {
+      if(st.mode==="approach"){st.walk=true;st.scroll+=RM?0:3;const e=1-Math.pow(1-p,2);st.monX=W+20+(monTargetX()-W-20)*e;walkF=Math.floor(t/140)%2;if(p>=1)setMode("idle",0)}
+      if(st.mode==="jump"){const a=Math.sin(Math.PI*p);hy=g0-a*H*0.42;hx=heroBaseX()+p*W*0.06;if(p>=1){setMode("idle",0)}}
+      if(st.mode==="hit"){const k=p<0.4?p/0.4:1-(p-0.4)/0.6;st.monX=monTargetX()-k*W*0.22;hx=heroBaseX()-(p>0.35?Math.sin(Math.PI*Math.min(1,(p-0.35)/0.65))*W*0.04:0);if(p>=1){setMode("idle",0);if(st.monAlive){st.monAlive=false;burst(st.monX+6*P,g0-5*P,["#9aa0b8","#d0d4e4"],16)}}}
+      if(st.mode==="clear"){st.scroll+=RM?0:4;walkF=Math.floor(t/120)%2;hx=heroBaseX()+Math.min(1,p)*W*0.6;if(p>=1){setMode("idle",0);st.offstage=true}}
+      if(st.mode==="enter"){st.scroll+=RM?0:3;walkF=Math.floor(t/140)%2;hx=-P*14+(heroBaseX()+P*14)*p;if(p>=1){setMode("idle",0)}}
+      if(st.offstage&&st.mode==="idle")hx=W+50;
+      // monster
+      if(st.monAlive&&st.monX!=null){const sq=st.mode==="jump"&&p>0.35?Math.min(1,(p-0.35)*3):0;
+        if(st.mode==="jump"&&p>0.5&&!st.burst){st.burst=true;burst(st.monX+6*P,g0-5*P,[L().mon,"#ffd84a","#ffffff"]);st.monAlive=false}
+        else{drawMon(st.monX,L().mon,sq);if(st.mode!=="hit")sign(st.monX,st.label)}}
+      if(st.mode==="hit"&&p>0.3&&!st.hurtDone){st.hurtDone=true;st.hurt=t;st.shake=RM?0:10;pop("−20 生命","#ff6475",heroBaseX()+6*P,g0-H*0.45)}
+      // hero
+      const blink=t-st.hurt<700&&Math.floor(t/80)%2===0;
+      if(st.fallen){cx.save();cx.translate(hx+16*P,g0);cx.rotate(-Math.PI/2);drawHero(0,0,0,false);cx.restore()}
+      else if(!blink)drawHero(hx,hy,walkF,false);
+      if(t-st.hurt<250){cx.fillStyle="rgba(255,60,80,.22)";cx.fillRect(0,0,W,H)}
+    }
+    // particles
+    st.parts=st.parts.filter(q=>q.life>0);for(const q of st.parts){q.x+=q.vx;q.y+=q.vy;q.vy+=0.12;q.life-=0.018;cx.globalAlpha=Math.max(0,q.life);cx.fillStyle=q.c;cx.fillRect(Math.round(q.x),Math.round(q.y),P,P)}cx.globalAlpha=1;
+    // pops
+    st.pops=st.pops.filter(o=>t-o.t0<1400);
+    for(const o of st.pops){const k=(t-o.t0)/1400;cx.globalAlpha=1-k;cx.font=`${Math.max(14,P*4)}px "ZCOOL KuaiLe",sans-serif`;cx.textAlign="center";cx.textBaseline="middle";cx.fillStyle="#1b1b2a";cx.fillText(o.text,o.x+2,o.y-k*40+2);cx.fillStyle=o.color;cx.fillText(o.text,o.x,o.y-k*40)}cx.globalAlpha=1;
+    // banner
+    if(st.banner){const k=(t-st.banner.t0)/1800;if(k>=1)st.banner=null;else{const a=k<0.15?k/0.15:k>0.8?(1-k)/0.2:1;cx.globalAlpha=a;cx.fillStyle="rgba(22,26,49,.82)";cx.fillRect(0,H*0.3,W,H*0.24);cx.font=`${Math.max(20,P*6)}px "ZCOOL KuaiLe",sans-serif`;cx.textAlign="center";cx.textBaseline="middle";cx.fillStyle="#ffc94a";cx.fillText(st.banner.text,W/2,H*0.42);cx.globalAlpha=1}}
+    if(shaking)cx.restore();
+    requestAnimationFrame(frame);
+  }
+  requestAnimationFrame(frame);
+  return{
+    busy:()=>st.mode==="approach"||st.mode==="jump"||st.mode==="hit"||st.mode==="enter",
+    approach(label){st.end=false;st.fallen=false;st.label=label;st.monAlive=true;st.burst=false;st.hurtDone=false;st.li=S.li;
+      if(st.offstage){st.offstage=false;setMode("enter",700);st.monX=W+40;setTimeout(()=>{if(st.mode==="idle"){setMode("approach",900)}},RM?160:720)}
+      else{st.monX=W+40;setMode("approach",900)}},
+    jump(text,stat){if(st.mode==="approach"||st.mode==="enter")st.monX=monTargetX();st.offstage=false;setMode("jump",750);const col=stat==="life"?"#5fd49b":stat==="money"?"#ffc94a":"#74c8ff";pop(text,col,heroBaseX()+W*0.12,gy()-H*0.62)},
+    hit(){if(st.mode==="approach"||st.mode==="enter")st.monX=monTargetX();st.offstage=false;st.hurtDone=false;setMode("hit",700)},
+    clear(){st.monAlive=false;setMode("clear",1100);burst(W*0.5,H*0.3,["#ffd84a","#ffffff","#5fd49b"],30)},
+    banner(li){st.li=li;st.banner={text:`第 ${li+1} 关 · ${LEVELS[li].name}`,t0:now()}},
+    fall(){st.fallen=true;st.monAlive=true},
+    revive(){st.fallen=false;st.li=S.li;st.banner={text:`重整旗鼓 · ${LEVELS[S.li].name}`,t0:now()}},
+    reset(){st.fallen=false;st.end=false;st.offstage=false;st.li=0;st.scroll=0;st.parts=[];st.pops=[];st.banner={text:`第 1 关 · ${LEVELS[0].name}`,t0:now()}},
+    ending(){st.end=true;st.monAlive=false;st.offstage=false;setMode("idle",0);burst(W/2,H*0.3,["#ffd84a","#ff6475","#74c8ff","#ffffff"],60)},
+    sync(){st.li=S.li;if(S.screen==="end")st.end=true;if(S.screen==="over")st.fallen=true}
+  };
+})();
+
+/* ---------- boot ---------- */
+function start(data){
+  S=data&&data.S&&data.S.screen?data.S:fresh();
+  scene.sync();
+  if(S.screen==="play"){render();scene.approach(cur()[0])}
+  else if(S.screen==="feedback"){render()}
+  else render();
+}
+window.claude?.hot?.snapshot?.(()=>({S}));
+const boot=()=>window.claude?.hot?.ready?window.claude.hot.ready(start):start(window.claude?.hot?.data??{});
+(document.fonts?document.fonts.ready:Promise.resolve()).then(boot,boot);
+</script>
+
+</body>
+</html>
